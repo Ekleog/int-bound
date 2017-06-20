@@ -3,29 +3,20 @@
 #[macro_use] extern crate typenum;
 
 use std::marker::PhantomData;
-use std::ops::{Add, BitAnd, Deref};
+use std::ops::{Add, Deref};
 use typenum as tn;
 
-pub trait Constraint {
-    fn check(n: isize) -> bool;
-}
+mod range;
+use range::*;
 
-pub struct Range<Low: tn::Integer, High: tn::Integer>(PhantomData<(Low, High)>);
+pub trait Integer<C: RangeTrait>: Deref<Target=isize> {}
 
-impl<Low: tn::Integer, High: tn::Integer> Constraint for Range<Low, High> {
-    fn check(n: isize) -> bool {
-        Low::to_isize() <= n && n <= High::to_isize()
-    }
-}
-
-pub trait Integer<C: Constraint>: Deref<Target=isize> {}
-
-pub struct Int<C: Constraint> {
+pub struct Int<C: RangeTrait> {
     val: isize,
     _constraint: PhantomData<C>,
 }
 
-impl<C: Constraint> Deref for Int<C> {
+impl<C: RangeTrait> Deref for Int<C> {
     type Target = isize;
 
     fn deref(&self) -> &isize {
@@ -33,21 +24,17 @@ impl<C: Constraint> Deref for Int<C> {
     }
 }
 
-impl<L1: tn::Integer + tn::Cmp<L2>, H1: tn::Integer + tn::Cmp<H2>, L2: tn::Integer, H2: tn::Integer>
-    Integer<Range<L2, H2>> for Int<Range<L1, H1>>
-    where op!((L1 >= L2) & (H1 <= H2)): tn::NonZero,
-          // TODO: there *must* be a better way than just following rustc's instructions
-          H1: tn::private::IsLessOrEqualPrivate<H2, <H1 as tn::Cmp<H2>>::Output>,
-          L1: tn::private::IsGreaterOrEqualPrivate<L2, <L1 as tn::Cmp<L2>>::Output>,
-          <L1 as tn::private::IsGreaterOrEqualPrivate<L2, <L1 as tn::Cmp<L2>>::Output>>::Output: BitAnd<<H1 as tn::private::IsLessOrEqualPrivate<H2, <H1 as tn::Cmp<H2>>::Output>>::Output>
+impl<R1: RangeTrait, R2: RangeTrait> Integer<R1> for Int<R2>
+    where R2: SubRange<R1>,
+          <R2 as SubRange<R1>>::Output: tn::NonZero
 { }
 
-impl<L1: tn::Integer + Add<L2>, H1: tn::Integer + Add<H2>, L2: tn::Integer, H2: tn::Integer>
-        Add<Int<Range<L1, H1>>> for Int<Range<L2, H2>>
-        where op!(L1 + L2): tn::Integer, op!(H1 + H2): tn::Integer {
-    type Output = Int<Range<op!(L1 + L2), op!(H1 + H2)>>;
+impl<R1: RangeTrait, R2: RangeTrait> Add<Int<R1>> for Int<R2>
+        where R1: Add<R2>,
+              op!(R1 + R2): RangeTrait {
+    type Output = Int<op!(R1 + R2)>;
 
-    fn add(self, rhs: Int<Range<L1, H1>>) -> Self::Output {
+    fn add(self, rhs: Int<R1>) -> Self::Output {
         Int {
             val: self.val + rhs.val,
             _constraint: PhantomData,
