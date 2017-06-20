@@ -3,7 +3,7 @@
 #[macro_use] extern crate typenum;
 
 use std::marker::PhantomData;
-use std::ops::{Add, Deref};
+use std::ops::{Add, BitAnd, Deref};
 use typenum as tn;
 
 pub trait Constraint {
@@ -18,6 +18,8 @@ impl<Low: tn::Integer, High: tn::Integer> Constraint for Range<Low, High> {
     }
 }
 
+pub trait Integer<C: Constraint>: Deref<Target=isize> {}
+
 pub struct Int<C: Constraint> {
     val: isize,
     _constraint: PhantomData<C>,
@@ -30,6 +32,15 @@ impl<C: Constraint> Deref for Int<C> {
         &self.val
     }
 }
+
+impl<L1: tn::Integer + tn::Cmp<L2>, H1: tn::Integer + tn::Cmp<H2>, L2: tn::Integer, H2: tn::Integer>
+    Integer<Range<L2, H2>> for Int<Range<L1, H1>>
+    where op!((L1 >= L2) & (H1 <= H2)): tn::NonZero,
+          // TODO: there *must* be a better way than just following rustc's instructions
+          H1: tn::private::IsLessOrEqualPrivate<H2, <H1 as tn::Cmp<H2>>::Output>,
+          L1: tn::private::IsGreaterOrEqualPrivate<L2, <L1 as tn::Cmp<L2>>::Output>,
+          <L1 as tn::private::IsGreaterOrEqualPrivate<L2, <L1 as tn::Cmp<L2>>::Output>>::Output: BitAnd<<H1 as tn::private::IsLessOrEqualPrivate<H2, <H1 as tn::Cmp<H2>>::Output>>::Output>
+{ }
 
 impl<L1: tn::Integer + Add<L2>, H1: tn::Integer + Add<H2>, L2: tn::Integer, H2: tn::Integer>
         Add<Int<Range<L1, H1>>> for Int<Range<L2, H2>>
@@ -55,7 +66,7 @@ pub fn constant<V: tn::Integer>() -> Int<Range<V, V>> {
 mod tests {
     use super::*;
 
-    fn check_42(x: Int<Range<tn::P42, tn::P42>>) {
+    fn check_42<I: Integer<Range<tn::P41, tn::P43>>>(x: I) {
         assert_eq!(*x, 42);
     }
 
