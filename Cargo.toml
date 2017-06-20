@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["Léo Gaspard <leo@gaspard.io>"]
 
 [dependencies]
+typenum = "1.9.0"
