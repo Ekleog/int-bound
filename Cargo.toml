@@ -1,5 +1,5 @@
 [package]
-name = "int-bound"
+name = "range-types"
 version = "0.1.0"
 authors = ["Léo Gaspard <leo@gaspard.io>"]
 
